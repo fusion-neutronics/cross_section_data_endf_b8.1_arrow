@@ -80,9 +80,9 @@ curl -L -o branching_ratios_sfr.json \
 
 ENDF_DIR="$HOME/nuclear_data/endfb-viii.1-endf"
 convert-chain \
-  --decay-dir "$ENDF_DIR/decay" \
-  --fpy-dir "$ENDF_DIR/nfy" \
-  --neutron-dir "$ENDF_DIR/neutrons" \
+  --decay-dir "$ENDF_DIR/decay-version.VIII.1" \
+  --fpy-dir "$ENDF_DIR/nfy-version.VIII.1" \
+  --neutron-dir "$ENDF_DIR/neutrons-version.VIII.1" \
   --branch-ratios branching_ratios_sfr.json \
   -o transmutation-endf-b8.1-sfr.arrow --library endfb-8.1
 
