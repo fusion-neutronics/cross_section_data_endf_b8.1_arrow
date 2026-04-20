@@ -1,0 +1,81 @@
+name: Build ENDF/B-VIII.1 Arrow Data
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gfortran
+
+      - name: Build NJOY2016
+        run: |
+          git clone https://github.com/njoy/NJOY2016.git
+          cd NJOY2016
+          mkdir build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          make -j$(nproc)
+          sudo cp njoy /usr/local/bin/
+          njoy --version || true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install nuclear_data_to_yamc_format
+          pip install --extra-index-url https://shimwell.github.io/wheels openmc
+
+      - name: Convert ENDF to Arrow format
+        run: |
+          convert-endf --release viii.1 --nuclides Fe56 -d endf-b8.1-arrow
+
+      - name: Compress Arrow files
+        run: |
+          tar -czf "endf-b8.1-arrow.tar.gz" "endf-b8.1-arrow/"
+
+      - name: Download decay and NFY sublibraries
+        run: |
+          python - <<'EOF'
+          from pathlib import Path
+          from nuclear_data_to_yamc_format.download import ENDF_RELEASES, download_and_extract
+          info = ENDF_RELEASES['viii.1']
+          dest = Path.home() / 'nuclear_data' / info['dir']
+          dl = dest / '_downloads'
+          for key in ('decay', 'nfy'):
+              d = info[key]
+              urls = [d['base_url'] + f for f in d['files']]
+              download_and_extract(urls, dest, dl)
+          EOF
+
+      - name: Build transmutation data file
+        run: |
+          curl -L -o branching_ratios_sfr.json \
+            https://github.com/openmc-data-storage/openmc_data/raw/main/src/openmc_data/depletion/branching_ratios_sfr.json
+          ENDF_DIR="$HOME/nuclear_data/endfb-viii.1-endf"
+          convert-chain \
+            --decay-dir "$ENDF_DIR/decay" \
+            --fpy-dir "$ENDF_DIR/nfy" \
+            --neutron-dir "$ENDF_DIR/neutrons" \
+            --branch-ratios branching_ratios_sfr.json \
+            -o transmutation-endf-b8.1-sfr.arrow --library endfb-8.1
+          tar -cf transmutation-endf-b8.1-sfr.arrow.tar transmutation-endf-b8.1-sfr.arrow
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: endf-b8.1-arrow
+          path: |
+            endf-b8.1-arrow.tar.gz
+            transmutation-endf-b8.1-sfr.arrow.tar
