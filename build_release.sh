@@ -45,7 +45,7 @@ fi
 
 endf_dir="$HOME/nuclear_data/endfb-viii.1-endf"
 echo "==> building transmutation chain file"
-convert-chain \
+convert-transmutation \
   --decay-dir   "$endf_dir/decay-version.VIII.1" \
   --fpy-dir     "$endf_dir/nfy-version.VIII.1" \
   --neutron-dir "$endf_dir/neutrons-version.VIII.1" \
